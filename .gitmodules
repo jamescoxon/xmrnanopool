@@ -1,0 +1,6 @@
+[submodule "jcnanolib"]
+	path = jcnanolib
+	url = git@github.com:jamescoxon/jcnanolib.git
+[submodule "changenow-api-python"]
+	path = changenow-api-python
+	url = https://gitlab.com/changenow-s-library-catalogue/changenow-api-python.git
