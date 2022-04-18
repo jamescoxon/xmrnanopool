@@ -1,0 +1,25 @@
+<!doctype html>
+<title>ZeroFeesPool (XMR Edition)</title>
+<table style="width:100%", border="1">
+	<tr>
+		<th>Mining Address</th>
+		<th>Workers</th>
+		<th>Total Accepted Shares</th>
+		<th>Last Share</th>
+		<th>Time Since</th>
+		<th>Hash Rate (KH/s Last Hour)</th>
+	</tr>
+        {% for item in name %}    
+        <tr>               
+            <td>{{item[0]}}</td>
+            <td>{{item[1]}}</td>
+            <td>{{item[2]}}</td>
+            <td>{{item[3]}}</td>
+            <td>{{item[4]}}</td>
+            <td>{{item[5]}}</td>
+        </tr>
+        {% endfor %}    
+</table>
+<p>Total Hash: {{total_hash}}KH/s</p>
+<p>Amount Due: {{amtDue}} (Payout occurs at 0.02XMR)</p>
+<p>Current Effort: {{percentage_amount}}%</p>

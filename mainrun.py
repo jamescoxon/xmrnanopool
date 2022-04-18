@@ -1,6 +1,8 @@
 #TODO
 # Add api
 # Store block shares in single redis (json?)
+# Regularly store worker shares in case proxy reset
+
 from monero.wallet import Wallet
 from monero.backends.jsonrpc import JSONRPCWallet
 
@@ -62,6 +64,10 @@ def send_transaction(from_ticker, amount, nano_address, api_key):
         logging.info(err)
     return response
 
+# strip ' ' from nano addresses (windows)
+def replace_apostrophe(nano_address):
+    return nano_address.replace("'", "")
+
 approx_fee = 0.0001
 from_ticker = 'xmr'
 
@@ -109,24 +115,23 @@ while True:
             total_shares = 0
             worker_shares = {}
             for worker in worker_json['workers']:
-#                logging.info('{} {}'.format(worker[0], worker[3]))
-
                 current_shares = int(worker[3])
+                worker_address = replace_apostrophe(worker[0])
                 # Calculate accepted shares for this round
-                if r.exists(worker[0]):
-                    total_worker_shares = int(r.get(worker[0]))
+                if r.exists(worker_address):
+                    total_worker_shares = int(r.get(worker_address))
                 else:
                     total_worker_shares = 0
 
                 accepted_shares = current_shares - total_worker_shares
 
                 # Add to our dict
-                worker_shares[worker[0]] = accepted_shares
+                worker_shares[worker_address] = accepted_shares
 
                 # Store in Redis the total accepted shares
-                r.set(worker[0], current_shares)
+                r.set(worker_address, current_shares)
                 # Store in Redis the accepted shares for this round
-                r.set('{}-shares-{}'.format(str(last_block), worker[0]), accepted_shares)
+                r.set('{}-shares-{}'.format(str(last_block), worker_address), accepted_shares)
 
                 total_shares = total_shares + accepted_shares
 
@@ -180,8 +185,10 @@ while True:
 
                 # Send share of Nano to worker
                 if Decimal(nano_share_raw) > Decimal(0):
-                    result = nano.send_xrb(worker, nano_share_raw, nano_address, index_pos, wallet_seed)
-                    logging.info(result)
+                    if len(worker) == 65 and worker[:5] == 'nano_':
+                        result = nano.send_xrb(worker, nano_share_raw, nano_address, index_pos, wallet_seed)
+                        logging.info(result)
+                        r.lpush('last_payout', str(worker))
 
                 # Add up all the shares to check that it matches original amount
                 check_total = check_total + nano_share_raw
