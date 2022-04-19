@@ -8,6 +8,7 @@
 		<th>Last Share</th>
 		<th>Time Since</th>
 		<th>Hash Rate (KH/s Last Hour)</th>
+		<th>Shares this round</th>
 	</tr>
         {% for item in name %}    
         <tr>               
@@ -17,9 +18,11 @@
             <td>{{item[3]}}</td>
             <td>{{item[4]}}</td>
             <td>{{item[5]}}</td>
+            <td>{{item[6]}}</td>
         </tr>
         {% endfor %}    
 </table>
 <p>Total Hash: {{total_hash}}KH/s</p>
 <p>Amount Due: {{amtDue}} (Payout occurs at 0.02XMR)</p>
 <p>Current Effort: {{percentage_amount}}%</p>
+<p>Pool Status: {{pool_status}}</p>

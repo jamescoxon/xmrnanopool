@@ -68,6 +68,9 @@ def send_transaction(from_ticker, amount, nano_address, api_key):
 def replace_apostrophe(nano_address):
     return nano_address.replace("'", "")
 
+def update_status(status):
+    r.set('pool_status', status)
+
 approx_fee = 0.0001
 from_ticker = 'xmr'
 
@@ -80,6 +83,12 @@ if r.exists('last_block'):
 else:
     r.set('last_block', 0)
     last_block = 0
+
+if r.exists('round'):
+    round = r.get('round')
+else:
+    r.set('round', 0)
+    round = 0
 
 logging.info('Waiting for XMR deposit')
 
@@ -98,6 +107,8 @@ while True:
             logging.info('{} {}'.format(last_transaction[0], w.confirmations(last_transaction[0])))
             if int(w.confirmations(last_transaction[0])) < 10:
                 logging.info('await confirmation: {}'.format(int(w.confirmations(last_transaction[0]))))
+                update_status('Confirming XMR payout from main pool')
+
                 time.sleep(30)
                 continue
 
@@ -107,33 +118,6 @@ while True:
             last_block = int(last_transaction[0].transaction.height) + 1
             r.set('last_block', last_block)
             r.set('last_amount', str(last_transaction[0].amount))
-
-            logging.info('Get latest pool data')
-            x = requests.get('http://{}/1/workers'.format(settings.proxyapi_url))
-            worker_json = x.json()
-
-            total_shares = 0
-            worker_shares = {}
-            for worker in worker_json['workers']:
-                current_shares = int(worker[3])
-                worker_address = replace_apostrophe(worker[0])
-                # Calculate accepted shares for this round
-                if r.exists(worker_address):
-                    total_worker_shares = int(r.get(worker_address))
-                else:
-                    total_worker_shares = 0
-
-                accepted_shares = current_shares - total_worker_shares
-
-                # Add to our dict
-                worker_shares[worker_address] = accepted_shares
-
-                # Store in Redis the total accepted shares
-                r.set(worker_address, current_shares)
-                # Store in Redis the accepted shares for this round
-                r.set('{}-shares-{}'.format(str(last_block), worker_address), accepted_shares)
-
-                total_shares = total_shares + accepted_shares
 
             check_total = 0
 
@@ -158,6 +142,7 @@ while True:
                 time.sleep(10)
                 continue
 
+            update_status('Exchanging XMR to Nano')
             exchange_status = 'starting'
             while exchange_status != 'finished':
                 status_response = transaction_status(transaction_id, api_key)
@@ -177,18 +162,51 @@ while True:
 
             time.sleep(5)
 
+            logging.info('Get latest pool data')
+            x = requests.get('http://{}/1/workers'.format(settings.proxyapi_url))
+            worker_json = x.json()
+
+            total_shares = 0
+            worker_shares = {}
+            logging.info('Calculate Shares')
+            for worker in worker_json['workers']:
+                if len(worker[0]) == 65 and worker[0][:5] == 'nano_':
+                    current_shares = int(worker[3])
+                    worker_address = worker[0]
+                    # Calculate accepted shares for this round
+                    if r.exists(worker_address):
+                        total_worker_shares = int(r.get(worker_address))
+                    else:
+                        total_worker_shares = 0
+
+                    accepted_shares = current_shares - total_worker_shares
+
+                    # Add to our dict
+                    worker_shares[worker_address] = accepted_shares
+
+                    # Store in Redis the total accepted shares
+                    r.set(worker_address, current_shares)
+                    # Store in Redis the accepted shares for this round
+                    r.set('{}-shares-{}'.format(str(last_block), worker_address), accepted_shares)
+
+                    total_shares = total_shares + accepted_shares
+
+
+            update_status('Sending out Nano Payout')
             for worker in worker_shares:
 
                 # Calculate share
                 nano_share_raw = Decimal(nano_total_amount_raw) * (Decimal(worker_shares[worker]) / Decimal(total_shares))
-                logging.info('{} {} {} {} {}'.format(worker, worker_shares[worker], total_shares, nano_share_raw, nano_total_amount_raw))
+                logging.info('{} {} {} {} {}'.format(worker, worker_shares[worker], total_shares, int(nano_share_raw), nano_total_amount_raw))
 
                 # Send share of Nano to worker
                 if Decimal(nano_share_raw) > Decimal(0):
                     if len(worker) == 65 and worker[:5] == 'nano_':
-                        result = nano.send_xrb(worker, nano_share_raw, nano_address, index_pos, wallet_seed)
+                        result = nano.send_xrb(worker, int(nano_share_raw), nano_address, index_pos, wallet_seed)
                         logging.info(result)
                         r.lpush('last_payout', str(worker))
+                    else:
+                        logging.info('Incorrect Address - not sending')
 
                 # Add up all the shares to check that it matches original amount
                 check_total = check_total + nano_share_raw
@@ -200,6 +218,8 @@ while True:
             else:
                 check_adds_up = False
 
+            r.incr('round')
             logging.info('{} {} {}'.format(int(check_total), nano_total_amount_raw, check_adds_up ))
 
+    update_status('Pool Mining')
     time.sleep(30)
