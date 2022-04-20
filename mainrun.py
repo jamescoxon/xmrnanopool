@@ -153,6 +153,8 @@ while True:
                 r.delete('exchange_address')
 
             # TODO add timeout
+            time.sleep(120)
+
             nano_total_amount_raw = 0
             while Decimal(nano_total_amount_raw) <= Decimal(1000000):
                 # Nano amount (we will get this by parsing account)

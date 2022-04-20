@@ -6,7 +6,7 @@ import redis
 
 r = redis.Redis(decode_responses=True)
 
-app = Flask(__name__)
+app = Flask(__name__, static_url_path='/xmrmining')
 
 def replace_apostrophe(nano_address):
 #    return nano_address.replace("'", "")
@@ -27,9 +27,21 @@ def get_workers():
 
 @app.route("/xmrmining")
 def main_website():
-    pool_details = requests.get('https://api.moneroocean.stream/miner/{}/stats'.format(settings.mining_address))
-    pool_amount = float(pool_details.json()['amtDue']) / 1000000000000.0
-    percentage_amount = (pool_amount / 0.02) * 100
+
+    if settings.main_pool == 'moneroocean':
+        main_pool_url = 'https://api.moneroocean.stream/miner/{}/stats'.format(settings.mining_address)
+    elif settings.main_pool == 'supportxmr':
+        main_pool_url = 'https://supportxmr.com/api/miner/{}/stats'.format(settings.mining_address)
+
+    try:
+        pool_details = requests.get(main_pool_url)
+        pool_amount = float(pool_details.json()['amtDue']) / 1000000000000.0
+        percentage_amount = (pool_amount / 0.02) * 100
+    except:
+        pool_amount = 0
+        percentage_amount = 0
+
+
     pool_status = r.get('pool_status')
 
     x = requests.get('http://{}/1/workers'.format(settings.proxyapi_url))
