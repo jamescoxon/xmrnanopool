@@ -6,7 +6,7 @@
 from monero.wallet import Wallet
 from monero.backends.jsonrpc import JSONRPCWallet
 
-import time, requests, sys, redis, logging
+import time, requests, sys, redis, logging, datetime
 from decimal import *
 getcontext().prec = 30
 from jcnanolib import nano
@@ -69,7 +69,44 @@ def replace_apostrophe(nano_address):
     return nano_address.replace("'", "")
 
 def update_status(status):
-    r.set('pool_status', status)
+    r.set('pool_status', '{} {}'.format(datetime.datetime.now(), status))
+
+def save_pool_state():
+    logging.info('Saving Pool State')
+    x = requests.get('http://{}/1/workers'.format(settings.proxyapi_url))
+    worker_json = x.json()
+    for worker in worker_json['workers']:
+        if len(worker[0]) == 65 and worker[0][:5] == 'nano_':
+            current_shares = int(worker[3])
+            worker_address = worker[0]
+            # Calculate accepted shares for this round
+            if r.exists(worker_address):
+                total_worker_shares = int(r.get(worker_address))
+            else:
+                total_worker_shares = 0
+
+            round_shares = current_shares - total_worker_shares
+
+            if r.exists("state-{}".format(worker_address)):
+                update_worker_state(worker_address, "total_shares", int(total_worker_shares))
+                update_worker_state(worker_address, "round_shares", int(round_shares))
+                update_worker_state(worker_address, "current_shares", int(current_shares))
+
+            else:
+                result = r.hset("state-{}".format(worker_address),mapping={
+                    "address": str(worker_address),
+                    "total_shares": int(total_worker_shares),
+                    "round_shares": int(round_shares),
+                    "last_payout" : 0,
+                    "last_hash" : "0",
+                    "last_round" : 0,
+                    "last_shares" : 0,
+                    "last_block" : 0,
+                    "current_shares": int(current_shares)
+                })
+
+def update_worker_state(worker, key, data):
+    r.hset("state-{}".format(worker), key, data)
 
 approx_fee = 0.0001
 from_ticker = 'xmr'
@@ -93,6 +130,7 @@ else:
 logging.info('Waiting for XMR deposit')
 
 while True:
+    save_pool_state()
     # Check Minimum
     minimum_exchange = min_exchange(from_ticker)
     logging.info(minimum_exchange)
@@ -147,6 +185,7 @@ while True:
             while exchange_status != 'finished':
                 status_response = transaction_status(transaction_id, api_key)
                 exchange_status = status_response['status']
+                update_status('Exchanging XMR to Nano: {}'.format(exchange_status))
                 logging.info(exchange_status)
                 time.sleep(10)
             else:
@@ -163,6 +202,7 @@ while True:
                 nano_total_amount_raw = Decimal(nano.get_account_balance(nano_address))
 
             time.sleep(5)
+            nano_total_amount_raw = Decimal(nano.get_account_balance(nano_address))
 
             logging.info('Get latest pool data')
             x = requests.get('http://{}/1/workers'.format(settings.proxyapi_url))
@@ -188,8 +228,12 @@ while True:
 
                     # Store in Redis the total accepted shares
                     r.set(worker_address, current_shares)
+                    update_worker_state(worker, 'current_shares', int(current_shares))
+                    update_worker_state(worker, 'last_block', int(last_block))
+
                     # Store in Redis the accepted shares for this round
                     r.set('{}-shares-{}'.format(str(last_block), worker_address), accepted_shares)
+                    update_worker_state(worker, 'last_shares', int(accepted_shares))
 
                     total_shares = total_shares + accepted_shares
 
@@ -206,7 +250,10 @@ while True:
                     if len(worker) == 65 and worker[:5] == 'nano_':
                         result = nano.send_xrb(worker, int(nano_share_raw), nano_address, index_pos, wallet_seed)
                         logging.info(result)
-                        r.lpush('last_payout', str(worker))
+                        r.lpush('{}_payout'.format(last_block), str(worker))
+                        r.set('{}-hash-{}'.format(str(last_block), worker), result['hash'])
+                        update_worker_state(worker, 'last_hash', str(result['hash']))
+
                     else:
                         logging.info('Incorrect Address - not sending')
 
@@ -214,6 +261,7 @@ while True:
                 check_total = check_total + nano_share_raw
 
                 r.set('{}-nano-{}'.format(str(last_block), worker), int(nano_share_raw))
+                update_worker_state(worker, 'last_nano', int(nano_share_raw))
 
             if Decimal(check_total) == Decimal(nano_total_amount_raw):
                 check_adds_up = True
@@ -223,5 +271,5 @@ while True:
             r.incr('round')
             logging.info('{} {} {}'.format(int(check_total), nano_total_amount_raw, check_adds_up ))
 
-    update_status('Pool Mining')
+    update_status('Pool Mining (not reached payout threshold)')
     time.sleep(30)

@@ -1,0 +1,50 @@
+<!doctype html>
+  <head>
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='main.css') }}" />
+  </head>
+
+<title>ZeroFeesPool (XMR Edition)</title>
+<h1>ZeroFeesPool (XMR Edition)</h1>
+<p><a href="{{ url_for('main_website') }}">Home</a></p>
+<table style="width:95%", border="1", id="workers">
+	<tr>
+		<th>Mining Address</th>
+	</tr>
+        <tr>               
+            <td><a href="https://nanolooker.com/account/{{name['id']}}">{{name['id']}}</a> (Nanolooker)</td>
+        </tr>
+</table>
+<br>
+<table style="width:95%", border="1", id="workers">
+	<tr>
+		<th>Last Block</th>
+                <th>Last Round Shares</th>
+		<th>Total Accepted Shares</th>
+		<th>Last Nano Payout (raw)</th>
+	</tr>
+        <tr>               
+            <td>{{name['last_block']}}</td>
+            <td>{{name['last_round_shares']}}</td>
+            <td>{{name['total_shares']}}</td>
+            <td>{{name['last_nano']}}</td>
+        </tr>
+</table>
+<br>
+<table style="width:95%", border="1", id="workers">
+	<tr>
+		<th>Workers</th>
+		<th>Current Accepted Shares (This Round)</th>
+		<th>Last Share</th>
+		<th>Time Since Last Share</th>
+		<th>Hash Rate (KH/s Last Hour)</th>
+	</tr>
+        <tr>               
+            <td>{{name['workers']}}</td>
+            <td>{{name['current_round_shares']}}</td>
+            <td>{{name['last_share']}}</td>
+            <td>{{name['time_since']}}</td>
+            <td>{{name['hash_rate']}}</td>
+        </tr>
+</table>
+<br>
+<p>For more info checkout the <a href="https://github.com/jamescoxon/xmrnanopool">codebase on github</a> and join our <a href="https://discord.gg/GHXVWeEjnb">discord</a></p>

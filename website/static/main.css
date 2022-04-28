@@ -1,7 +1,17 @@
 p {
   font-family: Arial, Helvetica, sans-serif;
-  font-size: 1.2em;
+  font-size: 1em;
   }
+
+label {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 1em;
+  }
+
+input[type=text] {
+  border: none;
+  border-bottom: 2px solid #04AA6D;
+}
 
 h1 {
   font-family: Verdana, Geneva, sans-serif;
@@ -17,7 +27,7 @@ h1 {
 
 #workers td, #workers th {
   border: 1px solid #ddd;
-  padding: 8px;
+  padding: 2px;
 }
 
 #workers tr:nth-child(even){background-color: #f2f2f2;}
@@ -25,8 +35,8 @@ h1 {
 #workers tr:hover {background-color: #ddd;}
 
 #workers th {
-  padding-top: 12px;
-  padding-bottom: 12px;
+  padding-top: 2px;
+  padding-bottom: 2px;
   text-align: left;
   background-color: #04AA6D;
   color: white;
